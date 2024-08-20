@@ -1,0 +1,93 @@
+name: infrastructure
+
+on:
+  workflow_dispatch:
+
+env:
+  TF_ROOT: ${{ github.workspace }}/infrastructure
+  MAIN_TF_ROOT: ${{ github.workspace }}/infrastructure/main
+  SHARED_TF_ROOT: ${{ github.workspace }}/infrastructure/shared
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  PROJECT_NAME: onley
+  AWS_REGION: us-east-1
+  AWS_ECR_URL: <project-id>.dkr.ecr.us-east-1.amazonaws.com
+
+jobs:
+  deploy-dev:
+    runs-on: self-hosted
+    env:
+      ENVIRONMENT: dev
+    if: github.ref == 'refs/heads/develop'
+    steps:
+      - name: checkout-code
+        uses: actions/checkout@v4
+
+      - name: setup-terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: latest
+
+      - name: terraform-prepare
+        run: |
+          cd ${{ env.MAIN_TF_ROOT }}
+          envsubst < backend.tfvars.template > backend.tfvars
+          envsubst < terraform.tfvars.template > terraform.tfvars
+          echo "Contents of backend.tfvars:"
+          cat backend.tfvars
+          echo "Contents of terraform.tfvars:"
+          cat terraform.tfvars
+
+      - name: terraform-init
+        run: |
+          cd ${{ env.MAIN_TF_ROOT }}
+          terraform init -backend-config=backend.tfvars
+
+      - name: terraform-plan
+        run: |
+          cd ${{ env.MAIN_TF_ROOT }}
+          terraform plan -var-file=terraform.tfvars -out=tfplan
+
+      - name: terraform-apply
+        run: |
+          cd ${{ env.MAIN_TF_ROOT }}
+          terraform apply -auto-approve tfplan
+
+  deploy-test:
+    runs-on: self-hosted
+    env:
+      ENVIRONMENT: test
+    if: github.ref == 'refs/heads/test'
+    steps:
+      - name: checkout-code
+        uses: actions/checkout@v4
+
+      - name: setup-terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: latest
+
+      - name: terraform-prepare
+        run: |
+          cd ${{ env.MAIN_TF_ROOT }}
+          envsubst < backend.tfvars.template > backend.tfvars
+          envsubst < terraform.tfvars.template > terraform.tfvars
+          echo "Contents of backend.tfvars:"
+          cat backend.tfvars
+          echo "Contents of terraform.tfvars:"
+          cat terraform.tfvars
+
+      - name: terraform-init
+        run: |
+          cd ${{ env.MAIN_TF_ROOT }}
+          terraform init -backend-config=backend.tfvars
+
+      - name: terraform-plan
+        run: |
+          cd ${{ env.MAIN_TF_ROOT }}
+          terraform plan -var-file=terraform.tfvars -out=tfplan
+
+      - name: terraform-apply
+        run: |
+          cd ${{ env.MAIN_TF_ROOT }}
+          terraform apply -auto-approve tfplan

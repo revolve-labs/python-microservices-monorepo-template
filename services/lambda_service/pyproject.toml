@@ -1,0 +1,100 @@
+[tool.poetry]
+name = "service-name"
+version = "0.1.0"
+description = "Service Description"
+authors = ["Alejandro Pereira <alejandro@axeom.xyz>"]
+license = ""
+
+[tool.poetry.dependencies]
+# main
+python = "^3.12"
+python-dotenv = "*"
+urllib3 = "1.26.15"
+pydantic-settings = "^2.1.0"
+psycopg2-binary = "*"
+asyncpg = "^0.29.0"
+sqlalchemy = "*"
+boto3 = "*"
+aioboto3 = "*"
+python-multipart = "^0.0.9"
+
+[tool.poetry.dev-dependencies]
+## linters
+black = "*"
+isort = "*"
+mypy = "*"
+pylint = "*"
+pytest-mock = "^3.12.0"
+
+## tests
+httpx = "*"
+pytest = "*"
+pytest-cov = "*"
+pytest-asyncio = "*"
+
+[build-system]
+requires = ["poetry-core^1.0.0", "poetry-dynamic-versioning"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 80
+target-version = ['py312']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | venv
+  | site-packages
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 80
+skip = ["venv", ".venv", "migrations", ".git", "proto", "site-packages"]
+multi_line_output = 3
+combine_as_imports = true
+include_trailing_comma = true
+lines_after_imports = 2
+use_parentheses = true
+
+[tool.mypy]
+python_version = 3.12
+ignore_missing_imports = true
+follow_imports = "silent"
+pretty = true
+exclude = ["tests/", "migrations/", ".venv/"]
+disallow_incomplete_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unreachable = true
+strict_equality = true
+plugins = "pydantic.mypy"
+
+[[pydantic-mypy]]
+warn_required_dynamic_aliases = true
+warn_untyped_fields = true
+init_typed = true
+
+[[mypy-tests."*"]] # exclude doesn't work in some cases, e.g. in VSCode integration
+ignore_errors = true
+
+[tool.pylint.MASTER]
+extension-pkg-whitelist="pydantic"
+disable="R,C"
+ignore-patterns=["^\\.venv"]
+
+[tool.pylint.FORMAT]
+max-line-length = 80
+
+[tool.pytest.ini_options]
+asyncio_mode="auto"

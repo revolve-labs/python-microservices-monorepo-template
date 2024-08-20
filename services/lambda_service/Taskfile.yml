@@ -1,0 +1,138 @@
+# https://taskfile.dev/
+version: "3"
+
+dotenv: ["dev.env"]
+
+vars:
+  PROJECT_NAME: service-name
+  PYTHON_VERSION: 3.12
+  VENV: service_name
+  PYTHON: python3
+  INFRA_TYPE: ecs
+  
+  ENV: dev
+  IMAGE_TAG: latest
+  AWS_ECR_REPO: <project-id>.dkr.ecr.us-west-2.amazonaws.com/service-name-dev
+  AWS_PROFILE: skai-dev
+
+env:
+  PYTHONPATH: "${PYTHONPATH}:."
+
+tasks:
+  pyenv-create:
+    desc: "Create virtual environment with pyenv"
+    cmds:
+      - "pyenv virtualenv {{.PYTHON_VERSION}} {{.VENV}}"  # Create a new virtual environment using pyenv
+
+  pyenv-setup:
+    cmds:
+      - "python3 -m pip install --upgrade pip"  # Upgrade pip to the latest version
+      - "pip install poetry"  # Install poetry for dependency management
+      - "poetry config virtualenvs.create false"  # Disable poetry's virtual environment creation
+      - "poetry install --no-root"  # Install project dependencies defined in pyproject.toml
+
+  pyenv-activate:
+    cmds:
+      - "pyenv activate {{.VENV}}"  # Activate the specified virtual environment
+
+  pyenv-remove:
+    cmds:
+      - "pyenv virtualenv-delete {{.VENV}}"  # Delete the specified virtual environment
+    
+  docker-build:
+    desc: "Build docker image using tags"
+    cmds:
+      - "docker build -f Dockerfile --platform=linux/amd64 -t {{.AWS_ECR_REPO}}:{{.IMAGE_TAG}} ."  # Build docker image using Dockerfile.ecs
+
+  docker-push:
+    desc: "Push docker image to AWS_ECR_REPO (assumes docker-login has been done)"
+    cmds:
+      - "docker push {{.AWS_ECR_REPO}}:{{.IMAGE_TAG}}"  # Push docker image to ECR
+
+  docker-run:
+    desc: "Run docker image"
+    cmds:
+      - "docker run -d -p 8000:8000 --name {{.PROJECT_NAME}} {{.PROJECT_NAME}}:latest"
+
+  isort-format:
+    cmds:
+      - "poetry run isort ."  # Format imports using isort
+
+  isort-check:
+    cmds:
+      - "poetry run isort --check --diff ."  # Check import format and show differences
+
+  black-format:
+    cmds:
+      - "poetry run black ."  # Format code using Black
+
+  black-check:
+    cmds:
+      - "poetry run black --check ."  # Check code format using Black
+
+  mypy:
+    cmds:
+      - "poetry run mypy ."  # Run type checks using mypy
+
+  pylint:
+    cmds:
+      - "poetry run pylint app"  # Lint the 'app' directory using pylint
+
+  get-env:
+    desc: "Get all parameters for an environment and save them into app/{env}.env. Call as: task get-env -- <env>"
+    vars:
+      ENV: '{{default .ENV .CLI_ARGS}}'
+    cmds:
+      - "python3 scripts/get_env_params.py {{.ENV | default .ENV}} {{.AWS_PROFILE}}"
+
+  migration:
+    desc: "create alembic migration (pass args after '--')"
+    cmds:
+      - "alembic revision --autogenerate {{.CLI_ARGS}}"
+
+  upgrade:
+    desc: "apply all alembic migration"
+    cmds:
+      - "alembic upgrade head"
+
+  downgrade:
+    desc: "rollback all alembic migrations"
+    cmds:
+      - "alembic downgrade base"
+
+  docker-db-up:
+    desc: "Launch PostgreSQL with PGVector in Docker"
+    cmds:
+      - docker-compose -f docker-compose-local.yml up -d
+
+  docker-db-down:
+    desc: "Stop and remove the PostgreSQL Docker container"
+    cmds:
+      - docker-compose -f docker-compose-local.yml down
+
+  pytest:
+    desc: "run pytest locally (pass args after '--')"
+    deps:
+      - docker-db-up
+    cmds:
+      - "poetry run pytest -s -vv -x tests/ --cov=app {{.CLI_ARGS}}"
+  
+  pytest-cicd:
+    desc: Run pytest in CI/CD environment (no docker-db-up)
+    cmds:
+      - "poetry run pytest -s -vv -x tests/ --cov=app {{.CLI_ARGS}}"
+
+  # groups
+  format:
+    desc: "run code formatters"
+    cmds:
+      - task: isort-format
+      - task: black-format
+
+  lint:
+    desc: "run linters"
+    cmds:
+      - task: isort-check
+      - task: black-check
+#      - task: pylint
+#      - task: mypy
